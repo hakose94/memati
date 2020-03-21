@@ -1,83 +1,399 @@
-// Bu Bir WebKodu.com ÃœrÃ¼nÃ¼dÃ¼r. http://www.webkodu.com
-  var snowsrc="https://img.lovepik.com/element/40034/7700.png_860.png"
+var snowStorm = null;
 
-  var no = 10;
+function SnowStorm() {
 
-  var hidesnowtime = 0;
+  // PROPERTIES
+  // ------------------
 
-  var snowdistance = "pageheight";
-// Bu Bir WebKodu.com ÃœrÃ¼nÃ¼dÃ¼r. http://www.webkodu.com
+  var imagePath = 'https://cdn.ticimax.com/Scripts/karScript/'; // relative path to snow images (including trailing slash)
+  var flakesMax = 128;
+  var flakesMaxActive = 64;
+  var vMaxX = 8;
+  var vMaxY = 4;
+  var usePNG = true;
+  var flakeBottom = null;        // Integer for fixed bottom, 0 or null for "full-screen" snow effect
+  var snowStick = true;
+  var snowCollect = false;
+  var targetElement = null;      // element which snow will be appended to (document body if undefined)
+  var followMouse = true;
+  var flakeTypes = 3;
+  var flakeWidth = 16;
+  var flakeHeight = 18;
 
-// Bu Bir WebKodu.com ÃœrÃ¼nÃ¼dÃ¼r. http://www.webkodu.com
-  var ie4up = (document.all) ? 1 : 0;
-  var ns6up = (document.getElementById&&!document.all) ? 1 : 0;
+  // ------------------
 
-	function iecompattest(){
-	return (document.compatMode && document.compatMode!="BackCompat")? document.documentElement : document.body
-	}// Bu Bir WebKodu.com ÃœrÃ¼nÃ¼dÃ¼r. http://www.webkodu.com
+  var zIndex = 999; // CSS stacking order applied to each snowflake
+  var flakeLeftOffset = 0; // amount to subtract from edges of container
+  var flakeRightOffset = 0; // amount to subtract from edges of container
 
-  var dx, xp, yp;   
-  var am, stx, sty;  
-  var i, doc_width = 800, doc_height = 600; 
-  
-  if (ns6up) {
-    doc_width = self.innerWidth;
-    doc_height = self.innerHeight;
-  } else if (ie4up) {
-    doc_width = iecompattest().clientWidth;
-    doc_height = iecompattest().clientHeight;
-  }// Bu Bir WebKodu.com ÃœrÃ¼nÃ¼dÃ¼r. http://www.webkodu.com
+  // --- End of user section ---
 
-  dx = new Array();
-  xp = new Array();
-  yp = new Array();
-  am = new Array();
-  stx = new Array();
-  sty = new Array();
-  snowsrc=(snowsrc.indexOf("https://img.lovepik.com/element/40034/7700.png_860.png")!=-1)? "https://img.lovepik.com/element/40034/7700.png_860.png" : snowsrc
-  for (i = 0; i < no; ++ i) {  
-    dx[i] = 0;                       
-    xp[i] = Math.random()*(doc_width-50);  
-    yp[i] = Math.random()*doc_height;
-    am[i] = Math.random()*20;        
-    stx[i] = 0.02 + Math.random()/10; // set step variables
-    sty[i] = 0.7 + Math.random();    
-		if (ie4up||ns6up) {
-      if (i == 0) {
-        document.write("<div id=\"dot"+ i +"\" style=\"POSITION: absolute; Z-INDEX: "+ i +"; VISIBILITY: visible; TOP: 15px; LEFT: 15px;\"><a href=\"http://www.webkodu.com\"><img src='"+snowsrc+"' border=\"0\"><\/a><\/div>");
-      } else {
-        document.write("<div id=\"dot"+ i +"\" style=\"POSITION: absolute; Z-INDEX: "+ i +"; VISIBILITY: visible; TOP: 15px; LEFT: 15px;\"><img src='"+snowsrc+"' border=\"0\"><\/div>");
-      }
-    }// Bu Bir WebKodu.com ÃœrÃ¼nÃ¼dÃ¼r. http://www.webkodu.com
+  var addEvent = function(o,evtName,evtHandler) {
+    typeof(attachEvent)=='undefined'?o.addEventListener(evtName,evtHandler,false):o.attachEvent('on'+evtName,evtHandler);
   }
-// Bu Bir WebKodu.com ÃœrÃ¼nÃ¼dÃ¼r. http://www.webkodu.com
-  function snowIE_NS6() { 
-    doc_width = ns6up?window.innerWidth-10 : iecompattest().clientWidth-10;
-		doc_height=(window.innerHeight && snowdistance=="windowheight")? window.innerHeight : (ie4up && snowdistance=="windowheight")?  iecompattest().clientHeight : (ie4up && !window.opera && snowdistance=="pageheight")? iecompattest().scrollHeight : iecompattest().offsetHeight;
-    for (i = 0; i < no; ++ i) {  
-      yp[i] += sty[i];
-      if (yp[i] > doc_height-50) {
-        xp[i] = Math.random()*(doc_width-am[i]-30);
-        yp[i] = 0;
-        stx[i] = 0.02 + Math.random()/10;
-        sty[i] = 0.7 + Math.random();
+
+  var removeEvent = function(o,evtName,evtHandler) {
+    typeof(attachEvent)=='undefined'?o.removeEventListener(evtName,evtHandler,false):o.detachEvent('on'+evtName,evtHandler);
+  }
+
+  var classContains = function(o,cStr) {
+    return (typeof(o.className)!='undefined'?o.className.indexOf(cStr)+1:false);
+  }
+
+  var s = this;
+  var storm = this;
+  this.timers = [];
+  this.flakes = [];
+  this.disabled = false;
+  this.terrain = [];
+  this.active = false;
+
+  var isIE = navigator.userAgent.match(/msie/i);
+  var isIE6 = navigator.userAgent.match(/msie 6/i);
+  var isOldIE = (isIE && (isIE6 || navigator.userAgent.match(/msie 5/i)));
+  var isWin9X = navigator.appVersion.match(/windows 98/i);
+  var isiPhone = navigator.userAgent.match(/iphone/i);
+  var isOpera = navigator.userAgent.match(/opera/i);
+  if (isOpera) isIE = false; // Opera (which may be sneaky, pretending to be IE by default)
+  var screenX = null;
+  var screenX2 = null;
+  var screenY = null;
+  var scrollY = null;
+  var vRndX = null;
+  var vRndY = null;
+  var windOffset = 1;
+  var windMultiplier = 2;
+  var pngSupported = (!isIE || (isIE && !isIE6 && !isOldIE)); // IE <7 doesn't do PNG nicely without crap filters
+  var docFrag = document.createDocumentFragment();
+  this.oControl = null; // toggle element
+  if (flakeLeftOffset == null) flakeLeftOffset = 0;
+  if (flakeRightOffset == null) flakeRightOffset = 0;
+
+  function rnd(n,min) {
+    if (isNaN(min)) min = 0;
+    return (Math.random()*n)+min;
+  }
+
+  this.randomizeWind = function() {
+    vRndX = plusMinus(rnd(vMaxX,0.2));
+    vRndY = rnd(vMaxY,0.2);
+    if (this.flakes) {
+      for (var i=0; i<this.flakes.length; i++) {
+        if (this.flakes[i].active) this.flakes[i].setVelocities();
       }
-      dx[i] += stx[i];
-      document.getElementById("dot"+i).style.top=yp[i]+"px";
-      document.getElementById("dot"+i).style.left=xp[i] + am[i]*Math.sin(dx[i])+"px";  
-    }// Bu Bir WebKodu.com ÃœrÃ¼nÃ¼dÃ¼r. http://www.webkodu.com
-    snowtimer=setTimeout("snowIE_NS6()", 10);
-  }// Bu Bir WebKodu.com ÃœrÃ¼nÃ¼dÃ¼r. http://www.webkodu.com
+    }
+  }
 
-	function hidesnow(){
-		if (window.snowtimer) clearTimeout(snowtimer)
-		for (i=0; i<no; i++) document.getElementById("dot"+i).style.visibility="hidden"
+  function plusMinus(n) {
+    return (parseInt(rnd(2))==1?n*-1:n);
+  }
+
+  this.scrollHandler = function() {
+    // "attach" snowflakes to bottom of window if no absolute bottom value was given
+    scrollY = (flakeBottom?0:parseInt(window.scrollY||document.documentElement.scrollTop||document.body.scrollTop));
+    if (isNaN(scrollY)) scrollY = 0; // Netscape 6 scroll fix
+    if (!flakeBottom && s.flakes) {
+      for (var i=0; i<s.flakes.length; i++) {
+        if (s.flakes[i].active == 0) s.flakes[i].stick();
+      }
+    }
+  }
+
+  this.resizeHandler = function() {
+    if (window.innerWidth || window.innerHeight) {
+      screenX = window.innerWidth-(!isIE?16:2)-flakeRightOffset;
+      screenY = (flakeBottom?flakeBottom:window.innerHeight);
+    } else {
+      screenX = (document.documentElement.clientWidth||document.body.clientWidth||document.body.scrollWidth)-(!isIE?8:0)-flakeRightOffset;
+      screenY = flakeBottom?flakeBottom:(document.documentElement.clientHeight||document.body.clientHeight||document.body.scrollHeight);
+    }
+    screenX2 = parseInt(screenX/2);
+  }
+
+  this.resizeHandlerAlt = function() {
+    screenX = targetElement.offsetLeft+targetElement.offsetWidth-flakeRightOffset;
+    screenY = flakeBottom?flakeBottom:targetElement.offsetTop+targetElement.offsetHeight;
+    screenX2 = parseInt(screenX/2);
+  }
+
+  this.freeze = function() {
+    // pause animation
+    if (!s.disabled) {
+      s.disabled = 1;
+    } else {
+      return false;
+    }
+    for (var i=0; i<s.timers.length; i++) {
+      clearInterval(s.timers[i]);
+    }
+  }
+
+  this.resume = function() {
+    if (s.disabled) {
+       s.disabled = 0;
+    } else {
+      return false;
+    }
+    s.timerInit();
+  }
+
+  this.toggleSnow = function() {
+    if (!s.flakes.length) {
+      // first run
+      s.start();
+      s.setControlActive(true);
+    } else {
+      s.active = !s.active;
+      if (s.active) {
+        s.show();
+        s.resume();
+        s.setControlActive(true);
+      } else {
+        s.stop();
+        s.freeze();
+        s.setControlActive(false);
+      }
+    }
+  }
+
+  this.setControlActive = function(bActive) {
+    // Y.D[(bActive?'addClass':'removeClass')](s.oControl,'active');
+  }
+
+  this.stop = function() {
+    this.freeze();
+    for (var i=this.flakes.length; i--;) {
+      this.flakes[i].o.style.display = 'none';
+    }
+    removeEvent(window,'scroll',s.scrollHandler);
+    removeEvent(window,'resize',s.resizeHandler);
+    if (!isIE) {
+      removeEvent(window,'blur',s.freeze);
+      removeEvent(window,'focus',s.resume);
+    }
+    // removeEventHandler(window,'resize',this.resizeHandler,false);
+  }
+
+  this.show = function() {
+    for (var i=this.flakes.length; i--;) {
+      this.flakes[i].o.style.display = 'block';
+    }
+  }
+
+  this.SnowFlake = function(parent,type,x,y) {
+    var s = this;
+    var storm = parent;
+    this.type = type;
+    this.x = x||parseInt(rnd(screenX-20));
+    this.y = (!isNaN(y)?y:-rnd(screenY)-12);
+    this.vX = null;
+    this.vY = null;
+    this.vAmpTypes = [2.0,1.0,1.25,1.0,1.5,1.75]; // "amplification" for vX/vY (based on flake size/type)
+    this.vAmp = this.vAmpTypes[this.type];
+
+    this.active = 1;
+    this.o = document.createElement('img');
+    this.o.style.position = 'absolute';
+    this.o.style.width = flakeWidth+'px';
+    this.o.style.height = flakeHeight+'px';
+    this.o.style.fontSize = '1px'; // so IE keeps proper size
+    this.o.style.zIndex = zIndex;
+    this.o.src = imagePath+this.type+(pngSupported && usePNG?'.png':'.gif');
+    document.body.appendChild(this.o);
+
+    this.refresh = function() {
+      s.o.style.left = s.x+'px';
+      s.o.style.top = s.y+'px';
+    }
+
+    this.stick = function() {
+      if (isIE6 || isiPhone || (targetElement != document.documentElement && targetElement != document.body)) {
+	    s.o.style.top = (screenY+scrollY-flakeHeight-storm.terrain[Math.floor(s.x)])+'px';
+	  } else {
+        s.o.style.display = 'none';
+	    s.o.style.top = 'auto';
+        s.o.style.bottom = '0px';
+		s.o.style.position = 'fixed';
+        s.o.style.display = 'block';
+      }
+    }
+
+    this.vCheck = function() {
+      if (s.vX>=0 && s.vX<0.2) {
+        s.vX = 0.2;
+      } else if (s.vX<0 && s.vX>-0.2) {
+        s.vX = -0.2;
+      }
+      if (s.vY>=0 && s.vY<0.2) {
+        s.vY = 0.2;
+      }
+    }
+
+    this.move = function() {
+      s.x += s.vX*windOffset;
+      s.y += (s.vY*s.vAmp);
+      s.refresh();
+      if (s.vX && screenX-s.x<flakeWidth+(s.vX*windOffset)) { // X-axis scroll check
+        s.x = 0;
+      } else if ((s.vX<0 || windOffset<0)&& s.x-flakeLeftOffset<0-flakeWidth) {
+        s.x = screenX-flakeWidth; // flakeWidth;
+      }
+      var yDiff = screenY+scrollY-s.y-storm.terrain[Math.floor(s.x)];
+      if (yDiff<flakeHeight) {
+        s.active = 0;
+        if (snowCollect && snowStick) {
+          var height = [0.75,1.5,0.75];
+          for (var i=0; i<2; i++) {
+            storm.terrain[Math.floor(s.x)+i+2] += height[i];
+          }
+        }
+        s.o.style.left = (s.x/screenX*100)+'%'; // set "relative" left (change with resize)
+        if (!flakeBottom) {
+	      if (snowStick) {
+            s.stick();
+		  } else {
+			s.recycle();
+		  }
+        }
+      }
+    }
+
+    this.animate = function() {
+      // main animation loop
+      // move, check status, die etc.
+      s.move();
+    }
+
+    this.setVelocities = function() {
+      s.vX = vRndX+rnd(vMaxX*0.12,0.1);
+      s.vY = vRndY+rnd(vMaxY*0.12,0.1);
+    }
+
+    this.recycle = function() {
+	  s.o.style.display = 'none';
+      s.o.style.position = 'absolute';
+      s.o.style.bottom = 'auto';
+      s.setVelocities();
+      s.vCheck();
+      s.x = parseInt(rnd(screenX-flakeWidth-20));
+      s.y = parseInt(rnd(screenY)*-1)-flakeHeight;
+      s.o.style.left = s.x+'px';
+      s.o.style.top = s.y+'px';
+	  s.o.style.display = 'block';
+      s.active = 1;
+    }
+
+    this.recycle(); // set up x/y coords etc.
+    this.refresh();
+
+  }
+
+  this.snow = function() {
+    var active = 0;
+    var used = 0;
+    var waiting = 0;
+    for (var i=s.flakes.length; i--;) {
+      if (s.flakes[i].active == 1) {
+        s.flakes[i].move();
+        active++;
+      } else if (s.flakes[i].active == 0) {
+        used++;
+      } else {
+        waiting++;
+      }
+    }
+    if (snowCollect && !waiting) { // !active && !waiting
+      // create another batch of snow
+      s.createSnow(flakesMaxActive,true);
+    }
+    if (active<flakesMaxActive) {
+      with (s.flakes[parseInt(rnd(s.flakes.length))]) {
+        if (!snowCollect && active == 0) {
+          recycle();
+        } else if (active == -1) {
+          active = 1;
+        }
+      }
+    }
+  }
+
+  this.mouseMove = function(e) {
+    if (!followMouse) return true;
+    var x = parseInt(e.clientX);
+    if (x<screenX2) {
+      windOffset = -windMultiplier+(x/screenX2*windMultiplier);
+    } else {
+      x -= screenX2;
+      windOffset = (x/screenX2)*windMultiplier;
+    }
+  }
+
+  this.createSnow = function(limit,allowInactive) {
+    for (var i=0; i<limit; i++) {
+      s.flakes[s.flakes.length] = new s.SnowFlake(s,parseInt(rnd(flakeTypes)));
+      if (allowInactive || i>flakesMaxActive) s.flakes[s.flakes.length-1].active = -1;
+    }
+    targetElement.appendChild(docFrag);
+  }
+
+  this.timerInit = function() {
+    s.timers = (!isWin9X?[setInterval(s.snow,20)]:[setInterval(s.snow,75),setInterval(s.snow,25)]);
+  }
+
+  this.init = function() {
+    for (var i=0; i<2048; i++) {
+      s.terrain[i] = 0;
+    }
+    s.randomizeWind();
+    s.createSnow(snowCollect?flakesMaxActive:flakesMaxActive*2); // create initial batch
+    addEvent(window,'resize',s.resizeHandler);
+    addEvent(window,'scroll',s.scrollHandler);
+    if (!isIE) {
+      addEvent(window,'blur',s.freeze);
+      addEvent(window,'focus',s.resume);
+    }
+    s.resizeHandler();
+    s.scrollHandler();
+    if (followMouse) {
+      addEvent(document,'mousemove',s.mouseMove);
+    }
+    s.timerInit();
+  }
+
+  var didInit = false;
+
+  this.start = function(bFromOnLoad) {
+	if (!didInit) {
+	  didInit = true;
+	} else if (bFromOnLoad) {
+	  // already loaded and running
+	  return true;
 	}
-		// Bu Bir WebKodu.com ÃœrÃ¼nÃ¼dÃ¼r. http://www.webkodu.com
+    if (typeof targetElement == 'string') {
+      targetElement = document.getElementById(targetElement);
+      if (!targetElement) throw new Error('Snowstorm: Unable to get targetElement');
+    }
+	if (!targetElement) {
+	  targetElement = (!isIE?(document.documentElement?document.documentElement:document.body):document.body);
+	}
+    if (targetElement != document.documentElement && targetElement != document.body) s.resizeHandler = s.resizeHandlerAlt; // re-map handler to get element instead of screen dimensions
+    s.resizeHandler(); // get bounding box elements
+    if (screenX && screenY && !s.disabled) {
+      s.init();
+      s.active = true;
+    }
+  }
 
-if (ie4up||ns6up){
-    snowIE_NS6();
-		if (hidesnowtime>0)
-		setTimeout("hidesnow()", hidesnowtime*1000)
-		}
-	// Bu Bir WebKodu.com ÃœrÃ¼nÃ¼dÃ¼r. http://www.webkodu.com
+  if (document.addEventListener) {
+	// safari 3.0.4 doesn't do DOMContentLoaded, maybe others - use a fallback to be safe.
+	document.addEventListener('DOMContentLoaded',function(){s.start(true)},false);
+    window.addEventListener('load',function(){s.start(true)},false);
+  } else {
+    addEvent(window,'load',function(){s.start(true)});
+  }
+
+}
+
+
+
+snowStorm = new SnowStorm();
