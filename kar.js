@@ -5,7 +5,7 @@ function SnowStorm() {
   // PROPERTIES
   // ------------------
 
-  var imagePath = 'https://images.elitema.com.tr/db_images/184/CKEditor/image/kar/favicon.png'; // relative path to snow images (including trailing slash)
+  var imagePath = 'https://cdn.ticimax.com/Scripts/karScript/'; // relative path to snow images (including trailing slash)
   var flakesMax = 128;
   var flakesMaxActive = 64;
   var vMaxX = 8;
